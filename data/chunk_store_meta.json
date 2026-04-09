@@ -1,0 +1,7 @@
+{
+  "num_chunks": 123039,
+  "chars_per_token": 3,
+  "max_tokens": 128,
+  "format": "jsonl",
+  "file": "data\\chunk_store.jsonl"
+}
