@@ -30,6 +30,6 @@ __pycache__/
 Thumbs.db
 
 # Generated dataset/model artifacts (large)
-data/*.jsonl
-data/*.pt
-data/chunk_store_meta.json
+# data/*.jsonl
+# data/*.pt
+# data/chunk_store_meta.json
