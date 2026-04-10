@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, cast
 
 import torch
 from torch.utils.data import Dataset
@@ -34,8 +34,33 @@ class PreTokenizedRetrieverDataset(Dataset[Dict[str, Dict[str, torch.Tensor]]]):
         }
 
 
-def load_pretokenized_cache(cache_path: str, map_location: str = "cpu") -> Dict[str, Any]:
-    return torch.load(Path(cache_path), map_location=map_location)
+def load_pretokenized_cache(
+    cache_path: str,
+    map_location: str = "cpu",
+    allow_unsafe_fallback: bool = True,
+) -> Dict[str, Any]:
+    path = Path(cache_path)
+
+    # PyTorch >=2.6 defaults to weights_only=True. Try safe mode first.
+    try:
+        cache = torch.load(path, map_location=map_location, weights_only=True)
+    except TypeError:
+        # Older PyTorch versions may not support the weights_only argument.
+        cache = torch.load(path, map_location=map_location)
+    except Exception as safe_err:
+        if not allow_unsafe_fallback:
+            raise RuntimeError(
+                "Safe pretokenized cache load failed and unsafe fallback is disabled. "
+                f"cache_path={path}. Original error: {safe_err}"
+            ) from safe_err
+
+        # Backward-compatible fallback for trusted local cache files.
+        cache = torch.load(path, map_location=map_location, weights_only=False)
+
+    if not isinstance(cache, dict):
+        raise TypeError(f"Expected pretokenized cache to be a dict, got {type(cache)}")
+
+    return cast(Dict[str, Any], cache)
 
 
 def validate_cache_meta(
