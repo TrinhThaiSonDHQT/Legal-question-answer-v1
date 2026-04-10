@@ -41,6 +41,30 @@ def load_pretokenized_cache(
 ) -> Dict[str, Any]:
     path = Path(cache_path)
 
+    def _read_header_bytes(p: Path, n: int = 256) -> bytes:
+        with p.open("rb") as f:
+            return f.read(n)
+
+    def _is_lfs_pointer(header: bytes) -> bool:
+        return header.startswith(b"version https://git-lfs.github.com/spec/v1")
+
+    def _looks_like_text(header: bytes) -> bool:
+        if not header:
+            return False
+        try:
+            decoded = header.decode("utf-8")
+        except UnicodeDecodeError:
+            return False
+        # Heuristic: plain text headers usually indicate wrong/corrupted cache format.
+        return all((ch.isprintable() or ch in "\r\n\t") for ch in decoded)
+
+    header = _read_header_bytes(path)
+    if _is_lfs_pointer(header):
+        raise RuntimeError(
+            "Pretokenized cache is a Git LFS pointer, not the real .pt binary: "
+            f"{path}. Run `git lfs pull` then retry."
+        )
+
     # PyTorch >=2.6 defaults to weights_only=True. Try safe mode first.
     try:
         cache = torch.load(path, map_location=map_location, weights_only=True)
@@ -55,7 +79,21 @@ def load_pretokenized_cache(
             ) from safe_err
 
         # Backward-compatible fallback for trusted local cache files.
-        cache = torch.load(path, map_location=map_location, weights_only=False)
+        try:
+            cache = torch.load(path, map_location=map_location, weights_only=False)
+        except Exception as unsafe_err:
+            if _looks_like_text(header):
+                preview = header[:80].decode("utf-8", errors="replace").replace("\n", "\\n")
+                raise RuntimeError(
+                    "Pretokenized cache is not a valid torch binary (text-like header). "
+                    f"cache_path={path}, header_preview='{preview}'. "
+                    "If this file comes from Git LFS, run `git lfs pull`."
+                ) from unsafe_err
+
+            raise RuntimeError(
+                "Pretokenized cache load failed in both safe and unsafe modes. "
+                f"cache_path={path}. Safe error: {safe_err}. Unsafe error: {unsafe_err}"
+            ) from unsafe_err
 
     if not isinstance(cache, dict):
         raise TypeError(f"Expected pretokenized cache to be a dict, got {type(cache)}")
