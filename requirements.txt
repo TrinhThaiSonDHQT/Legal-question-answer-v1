@@ -5,3 +5,4 @@ rank_bm25
 sentence-transformers
 rouge-score
 nltk
+peft
