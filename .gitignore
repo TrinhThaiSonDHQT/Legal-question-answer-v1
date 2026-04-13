@@ -30,6 +30,7 @@ __pycache__/
 Thumbs.db
 
 # Generated dataset
+data/*
 data/*.jsonl
 data/*.pt
 data/chunk_store_meta.json
