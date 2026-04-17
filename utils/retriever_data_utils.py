@@ -3,17 +3,17 @@ from typing import Dict, List
 import torch
 
 
-def build_training_pairs(data: List[Dict], num_negatives: int = 2) -> List[Dict]:
+def build_training_pairs(data: List[Dict], num_negatives: int = 5) -> List[Dict]:
     if num_negatives <= 0:
         raise ValueError("num_negatives must be > 0")
 
     pairs: List[Dict] = []
     for row in data:
         question = row.get("question", "")
-        positives = row.get("positive_chunks", [])
-        negatives = row.get("negative_chunks", [])
+        positive = row.get("positive", [])
+        negatives = row.get("negatives", [])
 
-        if not question or not positives or not negatives:
+        if not question or not positive or not negatives:
             continue
 
         clean_negs = [n for n in negatives if isinstance(n, str) and n.strip()]
@@ -21,7 +21,7 @@ def build_training_pairs(data: List[Dict], num_negatives: int = 2) -> List[Dict]
             continue
 
         # Use one positive and many negatives per sample.
-        positive = next((p for p in positives if isinstance(p, str) and p.strip()), None)
+        positive = positive if isinstance(positive, str) and positive.strip() else None
         if positive is None:
             continue
 
